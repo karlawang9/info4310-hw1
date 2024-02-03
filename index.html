@@ -1,0 +1,113 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>INFO 4310 - Homework 1</title>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+
+    <style>
+  
+        .neighborhood {
+          fill: lightgrey;
+        }
+        .outline {
+          fill: none;
+          stroke: white;
+          stroke-width: 1px;
+        }
+    
+      </style>
+</head>
+<body>
+
+    <svg id="sfmap" height="900" width="900">
+
+    </svg>
+
+    <script>
+
+            const svg = d3.select("#sfmap");
+            const width = svg.attr("width");
+            const height = svg.attr("height");
+            const margin = {top: 20, right: 20, bottom: 20, left:20};
+            const mapWidth = width - margin.left - margin.right;
+            const mapHeight = height - margin.top - margin.bottom;
+            const map = svg.append("g")
+                            .attr("transform",`translate(${margin.left},${margin.top})`);
+            const legend = svg.append("g")
+                              .attr("transform",`translate(${margin.left+50},${margin.top+40})`);
+
+            const requestData = async function() {
+
+                const sf = await d3.json("SF-Neighborhoods.geo.json");
+
+                var neighborhoods = topojson.feature(sf, sf.objects.SFNeighborhoods);
+                var neighborhoodsMesh = topojson.mesh(sf, sf.objects.SFNeighborhoods);
+                var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], neighborhoods);
+                var path = d3.geoPath().projection(projection);
+
+                map.selectAll("path.neighborhood").data(neighborhoods.features)
+                   .join("path")
+                   .attr("class", "neighborhood")
+                   .attr("d", path);
+                map.append("path").datum(neighborhoodsMesh)
+                   .attr("class", "outline")
+                   .attr("d", path);
+
+                // USED TO MAKE DATASET OF NUMBER OF TREES PER NEIGHBORHOOD num_trees.JSON
+                // const trees = await d3.csv("Street_Tree_List-2022-01-30_FILTERED.csv", d3.autoType);
+                // console.log(trees);
+                // numTrees = {};
+                // neighborhoods.features.forEach ( d => {
+                //   name = d.properties.name;
+                //   numTrees[name] = 0;
+                //   trees.forEach (t => {
+                //     if (d3.geoContains(d, [t.Longitude, t.Latitude])) {numTrees[name] += 1}
+                //   });
+                // });
+
+                const numTrees = await d3.json("num_trees.JSON");
+
+                // colors from https://hihayk.github.io/scale/#2/3/50/80/-51/67/20/14/1D9A6C/29/154/108/white
+                colors = ["#DEEDCF", "#99D492", "#56B870", "#1D9A6C", "#137177", "#0A2F51"]
+                const colorScale = d3.scaleQuantile()
+                            .domain(Object.values(numTrees))
+                            .range(colors);
+                
+                map.selectAll(".neighborhood")
+                   .style("fill", d => colorScale(numTrees[d.properties.name]));
+
+                let thresholds = colorScale.quantiles();
+                thresholds = thresholds.map(t => Math.round(t))
+                legend.append("text")
+                      .text("Number of Trees (per SF neighborhood)")
+                      .attr("alignment-baseline", "hanging")
+                      .style("font-weight", "bold")
+                      .style("font-size", "1.5em");
+                colors.forEach ( (d, i) => {
+                  legend.append("rect")
+                        .attr("x", i * 100)
+                        .attr("y", 30)
+                        .attr("width", 100)
+                        .attr("height", 20)
+                        .style("fill", d)
+                        .style("stroke", "white")
+                        .style("stroke-width", "1px");
+                });
+                thresholds.forEach ( (d, i) => {
+                  legend.append("text")
+                        .text(String(thresholds[i]))
+                        .attr("x", (i+1)*100)
+                        .attr("y", 55)
+                        .attr("alignment-baseline", "hanging")
+                        .attr("text-anchor", "middle");
+                });
+
+            };
+            requestData();
+
+    </script>
+
+</body>
+</html>
